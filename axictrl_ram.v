@@ -139,13 +139,11 @@ reg                         S_wcnt_en           ;
 reg                         S_wcnt_en_1d        ;
 reg                         S_ap_start_1d       ;
 reg                         S_maxi_arvalid_en   ;
-reg                         S_maxi_arvalid_en_1d;
 
 
 always @(posedge I_clk)begin
     S_ap_start_1d   <= I_ap_start   ;
     S_wcnt_en_1d    <= S_wcnt_en    ; 
-    S_maxi_arvalid_en_1d<=S_maxi_arvalid_en;
 end
 
 always @(posedge I_clk)begin
