@@ -92,7 +92,7 @@ output      [C_M_AXI_USER_WIDTH-1:0]O_maxi_wuser    ,
 output      [                  15:0]O_maxi_wstrb    ,
 output      [                   1:0]O_maxi_wlast    ,   
 input                               I_maxi_wready   ,
-output                              O_maxi_wvalid   ,
+output reg                          O_maxi_wvalid   ,
 output reg  [C_M_AXI_DATA_WIDTH-1:0]O_maxi_wdata    ,       
 // master write response
 input       [C_M_AXI_ID_WIDTH-1  :0]I_maxi_bid      ,
@@ -138,26 +138,34 @@ wire                        S_wcnt_valid        ;
 reg                         S_wcnt_en           ;
 reg                         S_wcnt_en_1d        ;
 reg                         S_ap_start_1d       ;
+reg                         S_maxi_arvalid_en   ;
+reg                         S_maxi_arvalid_en_1d;
+
 
 always @(posedge I_clk)begin
     S_ap_start_1d   <= I_ap_start   ;
     S_wcnt_en_1d    <= S_wcnt_en    ; 
+    S_maxi_arvalid_en_1d<=S_maxi_arvalid_en;
 end
 
 always @(posedge I_clk)begin
     if(I_ap_start)begin
-        if(I_maxi_arready && (~O_maxi_arvalid) )begin
-            O_maxi_arvalid <= 1'b1;
+        if(I_maxi_arready  && (S_maxi_arvalid_en) )begin
+            O_maxi_arvalid      <= 1'b1;
+            S_maxi_arvalid_en   <= 1'b0;
         end
         else if(I_maxi_arready && (O_maxi_arvalid))begin
-            O_maxi_arvalid <= 1'b0;
+            O_maxi_arvalid      <= 1'b0;
+            S_maxi_arvalid_en   <= 1'b0;
         end
         else begin 
-            O_maxi_arvalid <= O_maxi_arvalid; 
+            O_maxi_arvalid      <= 1'b0; 
+            S_maxi_arvalid_en   <= 1'b0;
         end
     end
     else begin
         O_maxi_arvalid <= 1'b0;
+        S_maxi_arvalid_en   <= 1'b1;
     end
 end
 
@@ -348,7 +356,7 @@ always @(posedge I_clk)begin
 end
 
 always @(posedge I_clk)begin
-    if(I_ap_stawt)begin
+    if(I_ap_start)begin
         if(I_maxi_awready && (~O_maxi_awvalid) )begin
             O_maxi_awvalid <= 1'b1;
         end
@@ -370,7 +378,7 @@ end
 
 
 always @(posedge I_clk)begin
-    O_maxi_wvalid <= S_rcnt_en_2d && S_rcnt_en ;
+    O_maxi_wvalid <= S_rcnt_en_1d && S_rcnt_en ;
 end
 
 endmodule
