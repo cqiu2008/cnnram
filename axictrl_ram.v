@@ -62,7 +62,7 @@ output      [                   3:0]O_maxi_arregion ,
 output      [C_M_AXI_SIZE_WIDTH-1:0]O_maxi_arsize   ,
 output reg  [C_M_AXI_LEN_WIDTH-1 :0]O_maxi_arlen    ,
 input                               I_maxi_arready  ,   
-output reg                          O_maxi_arvalid  ,
+output                              O_maxi_arvalid  ,
 output reg  [C_M_AXI_ADDR_WIDTH-1:0]O_maxi_araddr   ,
 // master read data channel
 input       [C_M_AXI_ID_WIDTH-1  :0]I_maxi_rid      ,
@@ -84,7 +84,7 @@ output      [                   3:0]O_maxi_awregion ,
 output      [C_M_AXI_SIZE_WIDTH-1:0]O_maxi_awsize   ,
 output reg  [C_M_AXI_LEN_WIDTH-1 :0]O_maxi_awlen    ,
 input                               I_maxi_awready  ,   
-output reg                          O_maxi_awvalid  ,
+output                              O_maxi_awvalid  ,
 output reg  [C_M_AXI_ADDR_WIDTH-1:0]O_maxi_awaddr   ,
 // master write data channel
 output      [C_M_AXI_ID_WIDTH-1  :0]O_maxi_wid      ,
@@ -102,16 +102,30 @@ input                               I_maxi_bvalid   ,
 output reg                          O_maxi_bready   
 );
 
+parameter ASIZE = 10                            ;
+parameter DSIZE = C_M_AXI_DATA_WIDTH            ;
+reg  [             ASIZE-1:0]S_len              ;   
+reg  [             ASIZE-1:0]S_wcnt             ; 
+wire                         S_wcnt_valid       ;
+reg                          S_wcnt_en          ;
+reg                          S_wcnt_en_1d       ;
+wire [             ASIZE-1:0]S_waddr            ;
+wire [             DSIZE-1:0]S_wdata            ;
+wire                         S_wr               ;
+wire [             ASIZE-1:0]S_raddr            ;
+wire [             DSIZE-1:0]S_rdata            ;
+reg  [             DSIZE-1:0]S_rdata_1d         ;
+wire                         S_rd               ;
+reg  [             ASIZE-1:0]S_rcnt             ;
+reg  [             ASIZE-1:0]S_rcnt_1d          ;
+reg                          S_rcnt_en          ;
+reg                          S_rcnt_en_1d       ;
+reg                          S_rcnt_en_2d       ;
+reg                          S_rcnt_extend_en   ;
+reg                          S_rcnt_extend      ;
+reg                          S_has_handshake_aw ; 
+reg                          S_has_write2ram    ;
 
-assign O_maxi_awuser    = {C_M_AXI_USER_WIDTH{1'b0}};
-assign O_maxi_awid      = {C_M_AXI_ID_WIDTH{1'b0}};
-assign O_maxi_awburst   = {2{1'b0}};
-assign O_maxi_awlock    = {2{1'b0}};
-assign O_maxi_awcache   = {4{1'b0}};
-assign O_maxi_awprot    = {3{1'b0}};
-assign O_maxi_awqos     = {4{1'b0}};
-assign O_maxi_awregion  = {4{1'b0}};
-assign O_maxi_awsize    = {C_M_AXI_SIZE_WIDTH{1'b0}};
 
 assign O_maxi_wid       = {C_M_AXI_ID_WIDTH{1'b0}};
 assign O_maxi_wuser     = {C_M_AXI_USER_WIDTH{1'b0}};
@@ -132,43 +146,15 @@ assign O_maxi_arqos     = {4{1'b0}};
 assign O_maxi_arregion  = {4{1'b0}};
 assign O_maxi_arsize    = {C_M_AXI_SIZE_WIDTH{1'b0}};
 
-reg [                  15:0]S_len               ;   
-reg [                  15:0]S_wcnt              ; 
-wire                        S_wcnt_valid        ;
-reg                         S_wcnt_en           ;
-reg                         S_wcnt_en_1d        ;
-reg                         S_ap_start_1d       ;
-reg                         S_maxi_arvalid_en   ;
-
+axvalid_ctrl U0_arvalid(
+.I_clk     (I_clk           ),
+.I_ap_start(I_ap_start      ),
+.I_axready (I_maxi_arready  ),
+.O_axvalid (O_maxi_arvalid  )
+);
 
 always @(posedge I_clk)begin
-    S_ap_start_1d   <= I_ap_start   ;
-    S_wcnt_en_1d    <= S_wcnt_en    ; 
-end
-
-always @(posedge I_clk)begin
-    if(I_ap_start)begin
-        if(I_maxi_arready  && (S_maxi_arvalid_en) )begin
-            O_maxi_arvalid      <= 1'b1;
-            S_maxi_arvalid_en   <= 1'b0;
-        end
-        else if(I_maxi_arready && (O_maxi_arvalid))begin
-            O_maxi_arvalid      <= 1'b0;
-            S_maxi_arvalid_en   <= 1'b0;
-        end
-        else begin 
-            O_maxi_arvalid      <= 1'b0; 
-            S_maxi_arvalid_en   <= 1'b0;
-        end
-    end
-    else begin
-        O_maxi_arvalid <= 1'b0;
-        S_maxi_arvalid_en   <= 1'b1;
-    end
-end
-
-always @(posedge I_clk)begin
-    O_maxi_araddr   <= I_base_addr + S_len;
+    O_maxi_araddr   <= I_base_addr ;
 end
 
 // master axi rdata channel 
@@ -188,6 +174,7 @@ always @(posedge I_clk)begin
     end
 end
 
+
 assign S_wcnt_valid = O_maxi_rready && I_maxi_rvalid && S_wcnt_en;
 
 always @(posedge I_clk)begin
@@ -200,9 +187,9 @@ always @(posedge I_clk)begin
 end
 
 always @(posedge I_clk)begin
-    S_len           <= I_len;
-    O_maxi_arlen    <= I_len;
-    O_maxi_awlen    <= I_len;
+    S_len           <= I_len[ASIZE-1:0];
+    O_maxi_arlen    <= I_len[ASIZE-1:0];
+    O_maxi_awlen    <= I_len[ASIZE-1:0];
 end
 
 always @(posedge I_clk)begin
@@ -219,43 +206,15 @@ always @(posedge I_clk)begin
     end
 end
 
-wire[C_M_AXI_ADDR_WIDTH-1:0]S_waddr         ;
-wire[C_M_AXI_DATA_WIDTH-1:0]S_wdata         ;
-wire                        S_wr            ;
-
 assign S_waddr = S_wcnt[15:0]               ;
 assign S_wdata = I_maxi_rdata               ;
 assign S_wr    = S_wcnt_valid               ;
 
-//// read ram process 
-// master axi rdata channel 
-
-wire [C_M_AXI_ADDR_WIDTH-1:0]S_raddr            ;
-wire [C_M_AXI_DATA_WIDTH-1:0]S_rdata            ;
-reg  [C_M_AXI_DATA_WIDTH-1:0]S_rdata_1d         ;
-wire                         S_rd               ;
-reg  [                  15:0]S_rcnt             ;
-reg  [                  15:0]S_rcnt_1d          ;
-reg                          S_rcnt_en          ;
-reg                          S_rcnt_en_1d       ;
-reg                          S_rcnt_en_2d       ;
-wire                         S_rcnt_valid       ;
-reg                          S_has_handshake_aw ; 
-reg                          S_has_write2ram    ;
-
-assign S_raddr[C_M_AXI_ADDR_WIDTH-1:16]= { C_M_AXI_ADDR_WIDTH-16{1'b0}};
-assign S_raddr[15:0] = S_rcnt[15:0];
-assign S_rd = S_rcnt_en && I_maxi_wready; 
-
-assign S_rcnt_valid = O_maxi_wvalid && I_maxi_wready    ;
-assign O_maxi_wdata = S_rdata_1d;
-
-
 // ram instance 
 sdpram #(
     .MEM_STYLE("block"),
-    .DSIZE(C_M_AXI_ADDR_WIDTH),
-    .ASIZE(C_M_AXI_DATA_WIDTH))
+    .DSIZE(DSIZE),
+    .ASIZE(ASIZE))
 U0_sdpram(
 .I_rst  (I_rst      ),  
 .I_wclk (I_clk      ),
@@ -269,14 +228,78 @@ U0_sdpram(
 .O_rdata(S_rdata    )
 );
 
+//// read ram process 
+// master axi awaddr channel 
+
+assign O_maxi_awuser    = {C_M_AXI_USER_WIDTH{1'b0}};
+assign O_maxi_awid      = {C_M_AXI_ID_WIDTH{1'b0}};
+assign O_maxi_awburst   = {2{1'b0}};
+assign O_maxi_awlock    = {2{1'b0}};
+assign O_maxi_awcache   = {4{1'b0}};
+assign O_maxi_awprot    = {3{1'b0}};
+assign O_maxi_awqos     = {4{1'b0}};
+assign O_maxi_awregion  = {4{1'b0}};
+assign O_maxi_awsize    = {C_M_AXI_SIZE_WIDTH{1'b0}};
+
+always @(posedge I_clk)begin
+    O_maxi_awaddr   <= I_base_addr + S_len;
+end
+
+axvalid_ctrl U1_awvalid(
+.I_clk     (I_clk           ),
+.I_ap_start(I_ap_start      ),
+.I_axready (I_maxi_awready  ),
+.O_axvalid (O_maxi_awvalid  )
+);
+
+// master axi wdata channel 
+
+always @(posedge I_clk)begin
+    if(I_ap_start)begin
+        if(I_maxi_awready && O_maxi_awvalid)begin
+            S_has_handshake_aw <= 1'b1;
+        end
+        else if(S_rcnt_en)begin
+            S_has_handshake_aw <= 1'b0;
+        end
+        else begin
+            S_has_handshake_aw <= S_has_handshake_aw ;
+        end
+    end
+    else begin
+        S_has_handshake_aw <= 1'b0;
+    end
+end
+
+always @(posedge I_clk)begin
+    S_wcnt_en_1d    <= S_wcnt_en    ; 
+end
+
+always @(posedge I_clk)begin
+    if(I_ap_start)begin
+        if ( (~S_wcnt_en) && S_wcnt_en_1d )begin
+            S_has_write2ram <= 1'b1;
+        end
+        else if(S_rcnt_en)begin
+            S_has_write2ram <= 1'b0;
+        end
+        else begin
+            S_has_write2ram <= S_has_write2ram ;
+        end
+    end
+    else begin
+            S_has_write2ram <= 1'b0;
+    end
+end
+
 always @(posedge I_clk)begin
     if(I_rst)begin
         S_rcnt_en <= 1'b0;
     end
-    if ( S_has_handshake_aw && S_has_write2ram )begin
+    else if ( S_has_handshake_aw && S_has_write2ram )begin
         S_rcnt_en <= 1'b1;
     end
-    else if( S_rd && (S_rcnt == S_len+1) )begin
+    else if( S_rd && (S_rcnt == S_len-1) )begin
         S_rcnt_en <= 1'b0;
     end
     else begin
@@ -284,31 +307,9 @@ always @(posedge I_clk)begin
     end
 end
 
-always @(posedge I_clk)begin
-    S_rcnt_en_1d<=S_rcnt_en     ; 
-    S_rcnt_en_2d<=S_rcnt_en_1d  ; 
-end
 
-always @(posedge I_clk)begin
-    if(S_rd)begin
-        S_rdata_1d  <= S_rdata      ;
-    end
-    else begin
-        S_rdata_1d  <= S_rdata_1d   ;
-    end
-end
-
-//always @(posedge I_clk)begin
-//    if(S_rcnt_en)begin
-//        if(S_rd && (S_rcnt_1d < S_cnt-1))begin
-//            S_rcnt_1d   <= S_rcnt   ;
-//        end
-//    end
-//    else begin
-//        S_rcnt_1d   <= 0            ; 
-//    end
-//end
-
+assign S_raddr = S_rcnt;
+assign S_rd = S_rcnt_en && I_maxi_wready; 
 
 always @(posedge I_clk)begin
     if(S_rcnt_en)begin
@@ -324,60 +325,86 @@ always @(posedge I_clk)begin
     end
 end
 
+always @(posedge I_clk)begin
+    S_rcnt_en_1d<=S_rcnt_en     ; 
+    S_rcnt_en_2d<=S_rcnt_en_1d  ; 
+end
 
 always @(posedge I_clk)begin
     if(I_ap_start)begin
-        if ( (~S_wcnt_en) && S_wcnt_en_1d )begin
-            S_has_write2ram <= 1'b1;
+        if(S_rcnt_en_1d && (!S_rcnt_en))begin
+            S_rcnt_extend <= I_maxi_wready;
+        end
+        else if(S_rcnt_extend_en && I_maxi_wready)begin
+            S_rcnt_extend <= S_rcnt_extend + 1'b1; 
+        end
+    end
+    else begin
+        S_rcnt_extend   <= 1'b0;
+    end
+end
+
+always @(posedge I_clk)begin
+    if(I_ap_start)begin
+        if(S_rcnt_en_1d && (!S_rcnt_en))begin
+            S_rcnt_extend_en <= 1'b1;
+        end
+        else if((S_rcnt_extend ==1'b1) && I_maxi_wready)begin
+            S_rcnt_extend_en <= 1'b0;
         end
         else begin
-            S_has_write2ram <= S_has_write2ram ;
+            S_rcnt_extend_en <= S_rcnt_extend_en ;
         end
     end
     else begin
-            S_has_write2ram <= 1'b0;
+        S_rcnt_extend_en <= 1'b0;
+    end
+end
+
+always @(posedge I_clk)begin
+    if(I_maxi_wready)begin
+        S_rdata_1d  <= S_rdata      ;
+    end
+    else begin
+        S_rdata_1d  <= S_rdata_1d   ;
     end
 end
 
 always @(posedge I_clk)begin
     if(I_ap_start)begin
-        if(I_maxi_awready && O_maxi_awvalid)begin
-            S_has_handshake_aw <= 1'b1;
+        if(S_rcnt_en_1d && (!S_rcnt_en_2d))begin
+            O_maxi_wvalid <= 1'b1;
+        end
+        else if((S_rcnt_extend ==1'b1) && I_maxi_wready)begin
+            O_maxi_wvalid <= 1'b0;
         end
         else begin
-            S_has_handshake_aw <= S_has_handshake_aw ;
+            O_maxi_wvalid <= O_maxi_wvalid ;
         end
     end
     else begin
-        S_has_handshake_aw <= 1'b0;
+        O_maxi_wvalid <= 1'b0; 
     end
 end
 
+assign O_maxi_wdata = S_rdata_1d;
+
+// master axi wresponse channel 
+
 always @(posedge I_clk)begin
-    if(I_ap_start)begin
-        if(I_maxi_awready && (~O_maxi_awvalid) )begin
-            O_maxi_awvalid <= 1'b1;
-        end
-        else if(I_maxi_awready && (O_maxi_awvalid))begin
-            O_maxi_awvalid <= 1'b0;
-        end
-        else begin 
-            O_maxi_awvalid <= O_maxi_awvalid; 
-        end
+    if(I_ap_start && I_maxi_bvalid)begin
+        O_maxi_bready <= 1'b1;
+        O_ap_done     <= 1'b1;
+        O_ap_ready    <= 1'b1;
     end
     else begin
-        O_maxi_awvalid <= 1'b0;
+        O_maxi_bready <= 1'b0;
+        O_ap_done     <= 1'b0;
+        O_ap_ready    <= 1'b0;
     end
 end
 
-always @(posedge I_clk)begin
-    O_maxi_awaddr   <= I_base_addr + S_len;
-end
 
-
-always @(posedge I_clk)begin
-    O_maxi_wvalid <= S_rcnt_en_1d && S_rcnt_en ;
-end
 
 endmodule
 
