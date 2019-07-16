@@ -93,7 +93,7 @@ output      [                  15:0]O_maxi_wstrb    ,
 output      [                   1:0]O_maxi_wlast    ,   
 input                               I_maxi_wready   ,
 output reg                          O_maxi_wvalid   ,
-output reg  [C_M_AXI_DATA_WIDTH-1:0]O_maxi_wdata    ,       
+output      [C_M_AXI_DATA_WIDTH-1:0]O_maxi_wdata    ,       
 // master write response
 input       [C_M_AXI_ID_WIDTH-1  :0]I_maxi_bid      ,
 input       [C_M_AXI_USER_WIDTH-1:0]I_maxi_buser    ,   
@@ -127,12 +127,7 @@ reg                          S_has_handshake_aw ;
 reg                          S_has_write2ram    ;
 
 
-assign O_maxi_wid       = {C_M_AXI_ID_WIDTH{1'b0}};
-assign O_maxi_wuser     = {C_M_AXI_USER_WIDTH{1'b0}};
-assign O_maxi_wstrb     = {16{1'b0}};
-assign O_maxi_wlast     = {2{1'b0}};
-
-assign O_ap_idle        = I_ap_start            ;
+assign O_ap_idle        = I_ap_start                ;
 
 //// write ram process 
 // master axi araddr channel 
@@ -206,7 +201,7 @@ always @(posedge I_clk)begin
     end
 end
 
-assign S_waddr = S_wcnt[15:0]               ;
+assign S_waddr = S_wcnt[ASIZE-1:0]          ;
 assign S_wdata = I_maxi_rdata               ;
 assign S_wr    = S_wcnt_valid               ;
 
@@ -391,6 +386,11 @@ assign O_maxi_wdata = S_rdata_1d;
 
 // master axi wresponse channel 
 
+assign O_maxi_wid       = {C_M_AXI_ID_WIDTH{1'b0}}  ;
+assign O_maxi_wuser     = {C_M_AXI_USER_WIDTH{1'b0}};
+assign O_maxi_wstrb     = {16{1'b0}}                ;
+assign O_maxi_wlast     = {2{1'b0}}                 ;
+
 always @(posedge I_clk)begin
     if(I_ap_start && I_maxi_bvalid)begin
         O_maxi_bready <= 1'b1;
@@ -403,8 +403,6 @@ always @(posedge I_clk)begin
         O_ap_ready    <= 1'b0;
     end
 end
-
-
 
 endmodule
 
