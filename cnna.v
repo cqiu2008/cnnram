@@ -391,15 +391,16 @@ cnna_FIN_DDR_m_axi_U(
     .I_BUSER	(S_maxi_buser		)
 );
 
-axictrl_ram #(
+test_axirambus #(
 	.C_M_AXI_ID_WIDTH	(1),
 	.C_M_AXI_LEN_WIDTH	(32),
 	.C_M_AXI_SIZE_WIDTH (3),
 	.C_M_AXI_USER_WIDTH	(1), 
     .C_M_AXI_ADDR_WIDTH (32),
-    .C_M_AXI_DATA_WIDTH (128))
-u0_axictrl_ram
-	(
+    .C_M_AXI_DATA_WIDTH (128),
+    .C_RAM_ADDR_WIDTH   (10), 
+    .C_RAM_DATA_WIDTH   (128))
+u0_axictrl_ram(
 .I_clk			 (ap_clk			),
 .I_rst			 (ap_rst_n_inv		),
 .I_ap_start		 (ap_start			),
